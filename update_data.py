@@ -313,6 +313,11 @@ def update_html(html, records, page_date):
     payload = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
     html = RAW_RE.sub(lambda m: m.group(1) + payload + m.group(3), html, count=1)
 
+    # 左上バッジ用の取込時刻
+    built_at = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    html = re.sub(r"(const DATA_BUILT_AT = ')[^']*(')",
+                  lambda m: m.group(1) + built_at + m.group(2), html, count=1)
+
     if page_date:
         ja = "{}年{}月{}日現在".format(page_date.year, page_date.month, page_date.day)
         idn = "per {} {} {}".format(page_date.day, ID_MONTHS[page_date.month], page_date.year)

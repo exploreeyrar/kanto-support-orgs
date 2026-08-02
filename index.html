@@ -30,6 +30,28 @@
   }
   h1 { font-size: 20px; margin: 0 0 4px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; max-width: 900px; }
+  .auto-update {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    background: #eef1f5;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .auto-update .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9ca3af;
+    flex-shrink: 0;
+  }
+  .auto-update .dot.ok { background: #16a34a; }
+  .auto-update .dot.ng { background: #dc2626; }
   #localeToggle {
     flex-shrink: 0;
     border: 1px solid var(--accent);
@@ -327,6 +349,7 @@
 
 <div class="topbar">
   <div>
+    <div class="auto-update" id="autoUpdate" title=""><span class="dot" id="autoUpdateDot"></span><span id="autoUpdateText"></span></div>
     <h1 data-i18n="title">登録支援機関登録簿 — 関東圏フィルター</h1>
     <div class="sub" data-i18n="subtitle">出入国在留管理庁公表データ（2026年7月28日現在）をもとに、本社所在地または支援業務を行う事務所の所在地が関東圏（東京都・神奈川県・埼玉県・千葉県・茨城県・栃木県・群馬県）に該当する登録支援機関を抽出しています。</div>
   </div>
@@ -523,6 +546,10 @@ const LOCALE = {
     cdHours: '時間',
     cdMins: '分',
     cdSecs: '秒',
+    autoUpdateRun: '自動更新',
+    autoUpdateData: 'データ取込',
+    autoUpdateChecking: '実行状況を確認中…',
+    autoUpdateFailed: '（前回の自動更新は失敗）',
     cdTitleAfter: 'FDA失業からの経過時間',
     cdRestore: '⏱ FDAリストラまであと',
     cdRestoreAfter: '⏱ FDA失業からの経過時間',
@@ -573,6 +600,10 @@ const LOCALE = {
     cdHours: 'jam',
     cdMins: 'menit',
     cdSecs: 'detik',
+    autoUpdateRun: 'Pembaruan otomatis',
+    autoUpdateData: 'Data diambil',
+    autoUpdateChecking: 'Memeriksa status…',
+    autoUpdateFailed: '(pembaruan terakhir gagal)',
     cdTitleAfter: 'Waktu berlalu sejak FDA di-PHK',
     cdRestore: '⏱ Hitung mundur PHK FDA',
     cdRestoreAfter: '⏱ Waktu sejak FDA di-PHK',
@@ -621,6 +652,49 @@ const LANG_ID_MAP = {
 function t(key) { return LOCALE[currentLocale][key]; }
 
 const contactedOnlyBtn = document.getElementById('contactedOnlyBtn');
+
+/* ---- 左上のバッジ：GitHub Actions の前回実行時刻とデータ取込時刻 ---- */
+const GH_REPO = 'exploreeyrar/kanto-support-orgs';
+const GH_WORKFLOW = 'update-data.yml';
+const DATA_BUILT_AT = '2026-08-02T12:57:51+09:00'; // update_data.py が毎回書き換える
+let lastRun = null;   // { at: ISO文字列, ok: boolean } — GitHub API から取得できた場合のみ
+
+function fmtDateTime(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderAutoUpdate() {
+  const textEl = document.getElementById('autoUpdateText');
+  const dotEl = document.getElementById('autoUpdateDot');
+  const parts = [];
+  if (lastRun) {
+    parts.push(`${t('autoUpdateRun')}: ${fmtDateTime(lastRun.at)}`);
+    if (!lastRun.ok) parts.push(t('autoUpdateFailed'));
+  }
+  parts.push(`${t('autoUpdateData')}: ${fmtDateTime(DATA_BUILT_AT)}`);
+  textEl.textContent = parts.join('　/　');
+  dotEl.className = 'dot' + (lastRun ? (lastRun.ok ? ' ok' : ' ng') : '');
+}
+
+// 公開リポジトリなら認証なしで直近の実行を取得できる。取れなければ取込時刻だけ表示する。
+function loadLastRun() {
+  const url = `https://api.github.com/repos/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/runs?per_page=1`;
+  fetch(url, { headers: { 'Accept': 'application/vnd.github+json' } })
+    .then(res => res.ok ? res.json() : Promise.reject(res.status))
+    .then(data => {
+      const run = data && data.workflow_runs && data.workflow_runs[0];
+      if (!run) return;
+      lastRun = {
+        at: run.updated_at || run.run_started_at || run.created_at,
+        ok: run.status !== 'completed' || run.conclusion === 'success'
+      };
+      renderAutoUpdate();
+    })
+    .catch(() => { /* オフライン・非公開リポジトリなどでは何もしない */ });
+}
 
 // build prefecture checkboxes
 const prefListEl = document.getElementById('prefList');
@@ -867,6 +941,7 @@ function applyLocale(loc) {
   });
   document.getElementById('pageTitle').textContent = LOCALE[loc].title;
   document.getElementById('cdClose').title = LOCALE[loc].cdClose;
+  renderAutoUpdate();
   updateLangOptionLabels();
   render();
 }
@@ -955,6 +1030,7 @@ function restoreFilters() {
 
 restoreFilters();
 applyLocale(currentLocale);
+loadLastRun();
 
 /* ---- 悬浮カウントダウン（移動可・非表示可） ---- */
 const CD_TARGET = new Date(2026, 7, 31, 16, 0, 0); // 2026-08-31 16:00（ローカル時間）
