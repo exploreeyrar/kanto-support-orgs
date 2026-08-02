@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.fanda.tsk.update</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>/Users/m4pro/fanda-tsk/update_data.py</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/m4pro/fanda-tsk</string>
+
+  <!-- 毎週月曜 9:00 に実行（スリープ中なら復帰後にまとめて 1 回実行される） -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key><integer>1</integer>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>0</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/m4pro/fanda-tsk/update.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/m4pro/fanda-tsk/update.log</string>
+</dict>
+</plist>

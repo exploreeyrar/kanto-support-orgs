@@ -1,0 +1,5 @@
+cache/
+*.bak
+update.log
+*.xlsx
+https-*.html

@@ -1,0 +1,35 @@
+name: 登録支援機関登録簿の更新
+
+on:
+  schedule:
+    # 毎週月曜 00:00 UTC = 09:00 JST
+    - cron: "0 0 * * 1"
+  workflow_dispatch:        # 手動実行もできる
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 最新版を取り込む
+        run: python3 update_data.py
+
+      - name: 変更があればコミット
+        run: |
+          if git diff --quiet -- index.html update_state.json; then
+            echo "更新なし"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html update_state.json
+          git commit -m "chore: 登録支援機関登録簿を更新 ($(date -u '+%Y-%m-%d'))"
+          git push
