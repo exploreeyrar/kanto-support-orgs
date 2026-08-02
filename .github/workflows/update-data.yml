@@ -2,9 +2,11 @@ name: 登録支援機関登録簿の更新
 
 on:
   schedule:
-    # 毎週月曜 00:00 UTC = 09:00 JST
-    - cron: "0 0 * * 1"
-  workflow_dispatch:        # 手動実行もできる
+    # 平日（月〜金）の 09:00 JST = 00:00 UTC
+    - cron: "0 0 * * 1-5"
+    # 平日（月〜金）の 16:00 JST = 07:00 UTC
+    - cron: "0 7 * * 1-5"
+  workflow_dispatch:
 
 permissions:
   contents: write
