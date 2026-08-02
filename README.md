@@ -15,6 +15,7 @@
 | `.github/workflows/update-data.yml` | GitHub Actions 用。**平日 09:00〜22:00 の毎正時**（1 日 14 回）に自動実行してコミット |
 | `update_state.json` | 前回取り込んだ Excel の content id / 公表日 / SHA-256 |
 | `cache/` | ダウンロードした Excel の置き場（Git 管理外） |
+| `worker/` | Telegram 送信を中継する Cloudflare Worker（Bot トークンの置き場） |
 
 ## データの持ち方
 
@@ -86,3 +87,61 @@ git remote add origin git@github.com:<user>/<repo>.git && git push -u origin mai
   スクリプトが HTML 内の `const DATA_BUILT_AT` を毎回書き換えている。
 
 つまり「自動更新は動いているのにデータ取込が古い」＝ MOJ 側に新版が出ていないだけ、という読み方ができる。
+
+## 連絡済みリストの共有（Telegram）
+
+「連絡済みリストのみ表示」の隣にボタンが 2 つある。
+
+- **📤 Telegram に送信**: 現在「連絡済み」にしている機関を、電話番号を識別子として Telegram に POST する
+  （Bot API の `sendMessage`、宛先は `@sgdailyokm`）。1 行 `電話番号 | 登録番号 | 名称` の形式で、
+  4096 文字の上限を超える場合は自動的に複数通に分割して順に送る。
+- **📥 リストを取り込む**: Telegram のメッセージをそのまま貼り付けて取り込む。電話番号で照合し、
+  この端末の「連絡済み」に**追加**する（既存は消えない）。ヘッダー行・日時行は無視し、
+  ハイフンや空白入りの番号、素の番号だけの一覧も読める。同じ電話番号を複数の機関が使っている場合
+  （実データで 48 番号・99 機関）は、その全機関が連絡済みになる。
+
+### 送信経路（Bot トークンはページに持たせない）
+
+```
+ブラウザ ──POST text──▶ Cloudflare Worker ──sendMessage(token)──▶ Telegram
+```
+
+`index.html` にトークンは無く、`TG_ENDPOINT` に Worker の URL だけを書く。トークンは Worker の Secret に置く。
+URL が漏れても任意のメッセージは送れないよう、Worker 側で次を強制している。
+
+| 制限 | 返す HTTP |
+|---|---|
+| POST 以外 | 405 |
+| `ALLOWED_ORIGINS` に無い Origin | 403 |
+| 本文が `#FANDA_TSK_CONTACTED` で始まらない | 400 |
+| 本文が 4096 文字超 | 413 |
+| `APP_KEY` を設定した場合、`X-App-Key` 不一致 | 403 |
+
+#### デプロイ手順
+
+```bash
+cd worker
+npx wrangler login                 # ブラウザで Cloudflare にログイン
+npx wrangler secret put TG_TOKEN   # 聞かれたら Bot トークンを貼る（画面には残らない）
+npx wrangler deploy                # 表示された https://....workers.dev を控える
+```
+
+デプロイ後、`index.html` の `TG_ENDPOINT` をその URL に書き換える。
+GitHub Pages 以外のドメインから使う場合は `wrangler.toml` の `ALLOWED_ORIGINS` に追記して再デプロイする
+（`file://` で開く場合の Origin は文字列 `null`）。
+
+動作確認:
+
+```bash
+curl -i -X POST "https://<URL>" -H "Origin: null" \
+  --data-urlencode 'text=#FANDA_TSK_CONTACTED v1
+test'
+```
+
+#### 注意
+
+- **既存のトークンは一度平文で共有されている**ので、@BotFather の `/revoke` で作り直し、新しい方だけを
+  `wrangler secret put` に入れること。古いトークンが `index.html` に入ったままコミットされていた場合、
+  Git の履歴からも読めるので再発行は必須。
+- `@sgdailyokm` は**チャンネル**（`TEST - botChannelPublic`）なので、送信するには Bot がそのチャンネルの
+  管理者になっている必要がある。`CHAT_ADMIN_REQUIRED` が返る場合は権限を確認すること。

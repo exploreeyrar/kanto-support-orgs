@@ -1,0 +1,16 @@
+name = "fanda-tsk-telegram"
+main = "worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+# 送信先チャンネル
+TG_CHAT = "@sgdailyokm"
+
+# 送信を許可する Origin をカンマ区切りで。
+#   - GitHub Pages: https://exploreeyrar.github.io
+#   - ローカルで index.html を file:// で開く場合: null
+#   - すべて許可する場合は *（非推奨）
+ALLOWED_ORIGINS = "https://exploreeyrar.github.io,null"
+
+# TG_TOKEN は Secret として登録する（wrangler secret put TG_TOKEN）。ここには書かない。
+# APP_KEY を Secret に登録すると X-App-Key ヘッダーの一致も必須になる（任意）。

@@ -3,3 +3,5 @@ cache/
 update.log
 *.xlsx
 https-*.html
+worker/node_modules/
+worker/.wrangler/
