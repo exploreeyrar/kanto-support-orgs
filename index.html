@@ -211,8 +211,9 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 100;
-    background: #1f2430;
-    color: #fff;
+    background: #262015;
+    color: #fcd34d;
+    border: 1px solid rgba(251,191,36,.45);
     border-radius: 12px;
     box-shadow: 0 6px 24px rgba(0,0,0,.22);
     padding: 10px 14px 12px;
@@ -224,11 +225,11 @@
   }
   #countdown.dragging { opacity: .92; }
   .cd-head { display: flex; align-items: center; gap: 10px; }
-  .cd-title { font-size: 13px; font-weight: 700; letter-spacing: .02em; flex: 1; }
+  .cd-title { font-size: 13px; font-weight: 700; letter-spacing: .02em; flex: 1; color: #fcd34d; }
   .cd-close {
     border: none;
-    background: rgba(255,255,255,.12);
-    color: #fff;
+    background: rgba(251,191,36,.16);
+    color: #fcd34d;
     width: 22px;
     height: 22px;
     border-radius: 6px;
@@ -237,7 +238,7 @@
     line-height: 1;
     flex-shrink: 0;
   }
-  .cd-close:hover { background: rgba(255,255,255,.24); }
+  .cd-close:hover { background: rgba(251,191,36,.3); }
   .cd-time {
     display: flex;
     justify-content: center;
@@ -246,9 +247,14 @@
     font-variant-numeric: tabular-nums;
   }
   .cd-unit { text-align: center; min-width: 46px; }
-  .cd-num { font-size: 22px; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .cd-label { font-size: 10px; color: #9ca3af; margin-top: 1px; }
-  .cd-target { text-align: center; font-size: 10px; color: #9ca3af; margin-top: 6px; }
+  .cd-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fbbf24;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .cd-label { font-size: 10px; color: #c8b378; margin-top: 1px; }
+  .cd-target { text-align: center; font-size: 10px; color: #b3a273; margin-top: 6px; }
   #cdRestore {
     position: fixed;
     top: 14px;
@@ -256,9 +262,9 @@
     transform: translateX(-50%);
     z-index: 100;
     display: none;
-    border: none;
-    background: #1f2430;
-    color: #fff;
+    border: 1px solid rgba(251,191,36,.45);
+    background: #262015;
+    color: #fcd34d;
     border-radius: 999px;
     padding: 6px 14px;
     font-size: 12px;
@@ -271,18 +277,18 @@
 
 <div id="countdown">
   <div class="cd-head">
-    <span class="cd-title">FDA距离被裁员还有多久</span>
-    <button type="button" class="cd-close" id="cdClose" title="隐藏">×</button>
+    <span class="cd-title" data-i18n="cdTitle">FDAリストラまであと</span>
+    <button type="button" class="cd-close" id="cdClose">×</button>
   </div>
   <div class="cd-time">
-    <div class="cd-unit"><div class="cd-num" id="cdDays">--</div><div class="cd-label">天</div></div>
-    <div class="cd-unit"><div class="cd-num" id="cdHours">--</div><div class="cd-label">时</div></div>
-    <div class="cd-unit"><div class="cd-num" id="cdMins">--</div><div class="cd-label">分</div></div>
-    <div class="cd-unit"><div class="cd-num" id="cdSecs">--</div><div class="cd-label">秒</div></div>
+    <div class="cd-unit"><div class="cd-num" id="cdDays">--</div><div class="cd-label" data-i18n="cdDays">日</div></div>
+    <div class="cd-unit"><div class="cd-num" id="cdHours">--</div><div class="cd-label" data-i18n="cdHours">時間</div></div>
+    <div class="cd-unit"><div class="cd-num" id="cdMins">--</div><div class="cd-label" data-i18n="cdMins">分</div></div>
+    <div class="cd-unit"><div class="cd-num" id="cdSecs">--</div><div class="cd-label" data-i18n="cdSecs">秒</div></div>
   </div>
-  <div class="cd-target">截止：2026年8月31日 16:00</div>
+  <div class="cd-target" data-i18n="cdTarget">期限：2026年8月31日 16:00</div>
 </div>
-<button type="button" id="cdRestore">⏱ FDA距离被裁员还有多久</button>
+<button type="button" id="cdRestore" data-i18n="cdRestore">⏱ FDAリストラまであと</button>
 
 <div class="topbar">
   <div>
@@ -457,6 +463,14 @@ const LOCALE = {
     sortDateAsc: '登録年月日（古い順）',
     cityLabel: '東京都 市区町村で絞り込み',
     cityHint: '未選択の場合は東京都全域が対象です',
+    cdTitle: 'FDAリストラまであと',
+    cdDays: '日',
+    cdHours: '時間',
+    cdMins: '分',
+    cdSecs: '秒',
+    cdTarget: '期限：2026年8月31日 16:00',
+    cdRestore: '⏱ FDAリストラまであと',
+    cdClose: '非表示にする',
     copyHint: 'クリックで電話番号をコピー',
     copied: '電話番号をコピーしました：',
     copyFailed: 'コピーできませんでした',
@@ -494,6 +508,14 @@ const LOCALE = {
     sortDateAsc: 'Tanggal registrasi (terlama dulu)',
     cityLabel: 'Saring per kota/distrik di Tokyo',
     cityHint: 'Jika tidak ada yang dipilih, seluruh Tokyo ditampilkan',
+    cdTitle: 'Sisa waktu sebelum FDA di-PHK',
+    cdDays: 'hari',
+    cdHours: 'jam',
+    cdMins: 'menit',
+    cdSecs: 'detik',
+    cdTarget: 'Batas waktu: 31 Agustus 2026, pukul 16.00',
+    cdRestore: '⏱ Hitung mundur PHK FDA',
+    cdClose: 'Sembunyikan',
     copyHint: 'Klik untuk menyalin nomor telepon',
     copied: 'Nomor telepon disalin: ',
     copyFailed: 'Gagal menyalin nomor telepon',
@@ -757,6 +779,7 @@ function applyLocale(loc) {
     el.placeholder = LOCALE[loc][el.dataset.i18nPlaceholder];
   });
   document.getElementById('pageTitle').textContent = LOCALE[loc].title;
+  document.getElementById('cdClose').title = LOCALE[loc].cdClose;
   updateLangOptionLabels();
   render();
 }
