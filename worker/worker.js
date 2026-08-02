@@ -50,7 +50,9 @@ export default {
   async fetch(request, env) {
     const allowed = String(env.ALLOWED_ORIGINS || '*')
       .split(',').map(s => s.trim()).filter(Boolean);
-    const origin = request.headers.get('Origin') || '';
+    // file:// で開いた場合、ブラウザは Origin を "null" にするか、そもそも付けてこない。
+    // どちらも同じ扱いにする（Origin なしのリクエストはブラウザの別サイトからは発生しない）。
+    const origin = request.headers.get('Origin') || 'null';
     const headers = corsHeaders(origin, allowed);
 
     if (request.method === 'OPTIONS') {
