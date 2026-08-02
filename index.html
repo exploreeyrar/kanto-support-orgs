@@ -96,6 +96,43 @@
     cursor: pointer;
     padding: 0;
   }
+  .mode-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  #contactedOnlyBtn {
+    border: 1px solid var(--border);
+    background: #fafbfc;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #contactedOnlyBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #contactedOnlyBtn[aria-pressed="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .mode-note { font-size: 12px; color: var(--accent); display: none; }
+  .mode-bar.active .mode-note { display: inline; }
+  .controls-row.muted { opacity: .45; pointer-events: none; }
+  .memo-input {
+    width: 170px;
+    min-height: 46px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 7px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.4;
+    resize: vertical;
+    background: #fff;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .memo-input:focus { outline: none; border-color: var(--accent); }
+  tr.contacted .memo-input { color: var(--text); }
   .stat { font-size: 13px; color: var(--muted); margin: 6px 2px 12px; }
   .stat b { color: var(--text); }
   table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 10px; overflow: hidden; }
@@ -254,7 +291,6 @@
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
   .cd-label { font-size: 10px; color: #c8b378; margin-top: 1px; }
-  .cd-target { text-align: center; font-size: 10px; color: #b3a273; margin-top: 6px; }
   #cdRestore {
     position: fixed;
     top: 14px;
@@ -286,7 +322,6 @@
     <div class="cd-unit"><div class="cd-num" id="cdMins">--</div><div class="cd-label" data-i18n="cdMins">分</div></div>
     <div class="cd-unit"><div class="cd-num" id="cdSecs">--</div><div class="cd-label" data-i18n="cdSecs">秒</div></div>
   </div>
-  <div class="cd-target" data-i18n="cdTarget">期限：2026年8月31日 16:00</div>
 </div>
 <button type="button" id="cdRestore" data-i18n="cdRestore">⏱ FDAリストラまであと</button>
 
@@ -299,7 +334,11 @@
 </div>
 
 <div class="panel">
-  <div class="controls-row">
+  <div class="mode-bar">
+    <button type="button" id="contactedOnlyBtn" aria-pressed="false" data-i18n="contactedOnlyBtn">連絡済みリストのみ表示</button>
+    <span class="mode-note" id="contactedOnlyNote" data-i18n="contactedOnlyNote">他のフィルターを無視して、連絡済みの機関をすべて表示しています</span>
+  </div>
+  <div class="controls-row" id="controlsRow">
     <div class="field" style="flex:1; min-width:260px;">
       <label class="title" data-i18n="searchLabel">キーワード検索（名称・住所・登録番号・代表者・言語）</label>
       <input type="text" id="search" data-i18n-placeholder="searchPlaceholder" placeholder="例：横浜市 / ベトナム語 / 株式会社〇〇">
@@ -361,6 +400,7 @@
       <th data-i18n="colRep">代表者</th>
       <th data-i18n="colLang">対応可能言語</th>
       <th data-i18n="colDate">登録年月日</th>
+      <th data-i18n="colMemo">MEMO</th>
     </tr>
   </thead>
   <tbody id="tbody"></tbody>
@@ -447,6 +487,21 @@ function saveContacted() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(contactedSet))); } catch (e) {}
 }
 
+// MEMO（登録番号ごとにブラウザへ保存）
+const MEMO_KEY = 'kanto_memo_v1';
+let memoMap = {};
+if (storageAvailable) {
+  try { memoMap = JSON.parse(localStorage.getItem(MEMO_KEY) || '{}') || {}; } catch (e) { memoMap = {}; }
+}
+let memoSaveTimer = null;
+function saveMemos() {
+  if (!storageAvailable) return;
+  try { localStorage.setItem(MEMO_KEY, JSON.stringify(memoMap)); } catch (e) {}
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 const LOCALE = {
   ja: {
     title: '登録支援機関登録簿 — 関東圏フィルター',
@@ -468,8 +523,9 @@ const LOCALE = {
     cdHours: '時間',
     cdMins: '分',
     cdSecs: '秒',
-    cdTarget: '期限：2026年8月31日 16:00',
+    cdTitleAfter: 'FDA失業からの経過時間',
     cdRestore: '⏱ FDAリストラまであと',
+    cdRestoreAfter: '⏱ FDA失業からの経過時間',
     cdClose: '非表示にする',
     copyHint: 'クリックで電話番号をコピー',
     copied: '電話番号をコピーしました：',
@@ -486,6 +542,10 @@ const LOCALE = {
     colRep: '代表者',
     colLang: '対応可能言語',
     colDate: '登録年月日',
+    colMemo: 'MEMO',
+    memoPlaceholder: 'メモを入力',
+    contactedOnlyBtn: '連絡済みリストのみ表示',
+    contactedOnlyNote: '他のフィルターを無視して、連絡済みの機関をすべて表示しています',
     emptyMsg: '該当するデータがありません',
     prevBtn: '← 前へ',
     nextBtn: '次へ →',
@@ -513,8 +573,9 @@ const LOCALE = {
     cdHours: 'jam',
     cdMins: 'menit',
     cdSecs: 'detik',
-    cdTarget: 'Batas waktu: 31 Agustus 2026, pukul 16.00',
+    cdTitleAfter: 'Waktu berlalu sejak FDA di-PHK',
     cdRestore: '⏱ Hitung mundur PHK FDA',
+    cdRestoreAfter: '⏱ Waktu sejak FDA di-PHK',
     cdClose: 'Sembunyikan',
     copyHint: 'Klik untuk menyalin nomor telepon',
     copied: 'Nomor telepon disalin: ',
@@ -531,6 +592,10 @@ const LOCALE = {
     colRep: 'Perwakilan',
     colLang: 'Bahasa yang Tersedia',
     colDate: 'Tanggal Registrasi',
+    colMemo: 'MEMO',
+    memoPlaceholder: 'Tulis catatan',
+    contactedOnlyBtn: 'Hanya daftar yang sudah dihubungi',
+    contactedOnlyNote: 'Menampilkan semua lembaga yang sudah dihubungi, mengabaikan filter lain',
     emptyMsg: 'Tidak ada data yang sesuai',
     prevBtn: '← Sebelumnya',
     nextBtn: 'Berikutnya →',
@@ -554,6 +619,8 @@ const LANG_ID_MAP = {
 };
 
 function t(key) { return LOCALE[currentLocale][key]; }
+
+const contactedOnlyBtn = document.getElementById('contactedOnlyBtn');
 
 // build prefecture checkboxes
 const prefListEl = document.getElementById('prefList');
@@ -663,10 +730,16 @@ function render() {
   const idOnly = document.getElementById('idOnlyToggle').checked;
   const cities = getCheckedCities();
   const sortDir = document.getElementById('sortFilter').value === 'date_asc' ? 'asc' : 'desc';
+  const contactedOnly = contactedOnlyBtn.getAttribute('aria-pressed') === 'true';
 
   cityPanelEl.style.display = prefs.includes('東京都') ? '' : 'none';
+  document.getElementById('controlsRow').classList.toggle('muted', contactedOnly);
+  contactedOnlyBtn.closest('.mode-bar').classList.toggle('active', contactedOnly);
 
-  const filtered = ALL_DATA.filter(item => matchesFilters(item, keyword, prefs, lang, idOnly, cities));
+  // 連絡済みモードでは他のフィルターを一切かけず、チェック済みの機関をすべて表示する
+  const filtered = contactedOnly
+    ? ALL_DATA.filter(item => contactedSet.has(item.no))
+    : ALL_DATA.filter(item => matchesFilters(item, keyword, prefs, lang, idOnly, cities));
   filtered.sort((a, b) => compareByDate(a, b, sortDir));
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -699,6 +772,7 @@ function render() {
       <td>${item.rep || ''}</td>
       <td class="lang">${item.lang || ''}</td>
       <td>${item.date || ''}</td>
+      <td><textarea class="memo-input" data-no="${item.no}" rows="2" placeholder="${t('memoPlaceholder')}">${escapeHtml(memoMap[item.no] || '')}</textarea></td>
     `;
     tbody.appendChild(tr);
   });
@@ -706,7 +780,20 @@ function render() {
   document.getElementById('pageInfo').textContent = t('pageInfoTemplate')(currentPage, totalPages);
   document.getElementById('prevBtn').disabled = currentPage <= 1;
   document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+  saveFilters();
 }
+
+// MEMO 入力（再描画で消えないよう委譲＋localStorage 保存）
+document.getElementById('tbody').addEventListener('input', (e) => {
+  const ta = e.target.closest('.memo-input');
+  if (!ta) return;
+  const no = ta.dataset.no;
+  if (ta.value.trim()) memoMap[no] = ta.value;
+  else delete memoMap[no];
+  clearTimeout(memoSaveTimer);
+  memoSaveTimer = setTimeout(saveMemos, 300);
+});
 
 // event delegation for the "contacted" checkbox so re-renders don't lose listeners
 document.getElementById('tbody').addEventListener('change', (e) => {
@@ -812,7 +899,61 @@ document.getElementById('cityNone').addEventListener('click', () => {
 });
 document.getElementById('prevBtn').addEventListener('click', () => { currentPage--; render(); });
 document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; render(); });
+contactedOnlyBtn.addEventListener('click', () => {
+  const on = contactedOnlyBtn.getAttribute('aria-pressed') === 'true';
+  contactedOnlyBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
+  currentPage = 1;
+  render();
+});
 
+/* ---- 画面の状態（検索語・各フィルター・ボタン・言語・ページ）を保存して復元する
+       初期値は東京都「渋谷区」のみチェック ---- */
+const FILTER_KEY = 'kanto_filters_v1';
+const DEFAULT_CITIES = ['渋谷区'];
+const searchEl = document.getElementById('search');
+const idOnlyEl = document.getElementById('idOnlyToggle');
+const sortEl = document.getElementById('sortFilter');
+
+function saveFilters() {
+  if (!storageAvailable) return;
+  try {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      keyword: searchEl.value,
+      prefs: getCheckedPrefs(),
+      cities: getCheckedCities(),
+      lang: langSelect.value,
+      idOnly: idOnlyEl.checked,
+      sort: sortEl.value,
+      contactedOnly: contactedOnlyBtn.getAttribute('aria-pressed') === 'true',
+      locale: currentLocale,
+      page: currentPage
+    }));
+  } catch (e) {}
+}
+
+function restoreFilters() {
+  let saved = null;
+  if (storageAvailable) {
+    try { saved = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); } catch (e) { saved = null; }
+  }
+  const cities = saved && Array.isArray(saved.cities) ? saved.cities : DEFAULT_CITIES;
+  cityListEl.querySelectorAll('input').forEach(cb => { cb.checked = cities.includes(cb.value); });
+  if (!saved) return;
+  if (typeof saved.keyword === 'string') searchEl.value = saved.keyword;
+  if (Array.isArray(saved.prefs)) {
+    prefListEl.querySelectorAll('input').forEach(cb => { cb.checked = saved.prefs.includes(cb.value); });
+  }
+  if (typeof saved.lang === 'string' && Array.from(langSelect.options).some(o => o.value === saved.lang)) {
+    langSelect.value = saved.lang;
+  }
+  if (typeof saved.idOnly === 'boolean') idOnlyEl.checked = saved.idOnly;
+  if (saved.sort === 'date_asc' || saved.sort === 'date_desc') sortEl.value = saved.sort;
+  if (saved.contactedOnly === true) contactedOnlyBtn.setAttribute('aria-pressed', 'true');
+  if (saved.locale === 'ja' || saved.locale === 'id') currentLocale = saved.locale;
+  if (Number.isInteger(saved.page) && saved.page > 0) currentPage = saved.page;
+}
+
+restoreFilters();
 applyLocale(currentLocale);
 
 /* ---- 悬浮カウントダウン（移動可・非表示可） ---- */
@@ -820,6 +961,7 @@ const CD_TARGET = new Date(2026, 7, 31, 16, 0, 0); // 2026-08-31 16:00（ロー�
 const CD_KEY = 'fda_countdown_v1';
 const cdEl = document.getElementById('countdown');
 const cdRestoreEl = document.getElementById('cdRestore');
+const cdTitleEl = cdEl.querySelector('.cd-title');
 const cdNums = {
   days: document.getElementById('cdDays'),
   hours: document.getElementById('cdHours'),
@@ -865,8 +1007,18 @@ setCdHidden(!!cdState.hidden);
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 function tickCountdown() {
-  let diff = Math.floor((CD_TARGET.getTime() - Date.now()) / 1000);
-  if (diff < 0) diff = 0;
+  // 期限前はカウントダウン、期限後は経過時間のカウントアップに切り替える
+  const delta = CD_TARGET.getTime() - Date.now();
+  const after = delta <= 0;
+  const diff = Math.floor(Math.abs(delta) / 1000);
+
+  const titleKey = after ? 'cdTitleAfter' : 'cdTitle';
+  cdTitleEl.dataset.i18n = titleKey;
+  cdTitleEl.textContent = t(titleKey);
+  const restoreKey = after ? 'cdRestoreAfter' : 'cdRestore';
+  cdRestoreEl.dataset.i18n = restoreKey;
+  cdRestoreEl.textContent = t(restoreKey);
+
   cdNums.days.textContent = Math.floor(diff / 86400);
   cdNums.hours.textContent = pad2(Math.floor(diff / 3600) % 24);
   cdNums.mins.textContent = pad2(Math.floor(diff / 60) % 60);
