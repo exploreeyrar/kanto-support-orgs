@@ -72,7 +72,8 @@ export default {
     }
 
     const text = await readText(request);
-    if (!text.startsWith(HEADER_PREFIX)) {
+    // 1 行目は挨拶文なので、本文のどこかにタグがあることを条件にする
+    if (!text.includes(HEADER_PREFIX)) {
       return json({ ok: false, description: 'unexpected payload' }, 400, headers);
     }
     if (text.length > MAX_LEN) {

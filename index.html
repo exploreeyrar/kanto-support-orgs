@@ -1199,6 +1199,8 @@ document.getElementById('tbody').addEventListener('click', (e) => {
    デプロイ後に発行される URL を下の TG_ENDPOINT に貼ること。 */
 const TG_ENDPOINT = 'https://fanda-tsk-telegram.fda-tsk.workers.dev';
 const EXPORT_HEADER = '#FANDA_TSK_CONTACTED v1';
+const EXPORT_GREETING = 'Saya telah menghubungi TSK berikut ini.';
+const MEMO_MARK = '↳ MEMO: ';   // 取り込み時はこの行を電話番号として拾わない
 const TG_MAX_CHARS = 3300;   // 本文の目安。ヘッダーを足しても Telegram の上限 4096 に収まる
 
 const digitsOf = s => String(s || '').replace(/\D/g, '');
@@ -1223,7 +1225,11 @@ function buildExportMessages() {
   const stamp = fmtDateTime(new Date().toISOString());
   const lines = items.map(item => {
     const phone = String(item.phone || '').split(/[\n,、]/)[0].trim();
-    return `${phone} | ${item.no} | ${item.name}`;
+    let line = `${phone} | ${item.no} | ${item.name}`;
+    // MEMO は改行を潰して 1 行にまとめる（取り込み側の解析を単純に保つため）
+    const memo = (memoMap[item.no] || '').replace(/\s*[\r\n]+\s*/g, ' / ').trim();
+    if (memo) line += `\n${MEMO_MARK}${memo}`;
+    return line;
   });
 
   const chunks = [];
@@ -1244,10 +1250,8 @@ function buildExportMessages() {
   return {
     items,
     chunks: chunks.map((body, i) => {
-      const head = total > 1
-        ? `${EXPORT_HEADER} (${i + 1}/${total})`
-        : EXPORT_HEADER;
-      return `${head}\n${stamp} / ${items.length} 件\n\n${body.join('\n')}`;
+      const tag = total > 1 ? `${EXPORT_HEADER} (${i + 1}/${total})` : EXPORT_HEADER;
+      return `${EXPORT_GREETING}\n${tag}\n${stamp} / ${items.length} 件\n\n${body.join('\n')}`;
     })
   };
 }
@@ -1294,6 +1298,7 @@ function parsePastedPhones(text) {
   String(text).split(/[\n\r]+/).forEach(rawLine => {
     const line = rawLine.trim();
     if (!line || line.startsWith('#')) return;                 // ヘッダー行
+    if (line.startsWith('↳')) return;                          // MEMO 行（番号として拾わない）
     if (/^\d{4}-\d{2}-\d{2}/.test(line)) return;               // 日時 + 件数の行
     const head = line.split('|')[0];
     const m = head.match(/0[\d\-\s()]{8,}/);

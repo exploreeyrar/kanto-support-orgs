@@ -3,8 +3,8 @@ main = "worker.js"
 compatibility_date = "2026-08-01"
 
 [vars]
-# 送信先チャンネル
-TG_CHAT = "@sgdailyokm"
+# 送信先グループ（"bodoh JP"）。@username ではなく数値 ID を使う
+TG_CHAT = "-5192236586"
 
 # 送信を許可する Origin をカンマ区切りで。
 #   - GitHub Pages: https://exploreeyrar.github.io
