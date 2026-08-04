@@ -15,7 +15,7 @@
  */
 
 const TG_API = 'https://api.telegram.org';
-const HEADER_PREFIX = '#FANDA_TSK_CONTACTED';
+const HEADER_PREFIX = '#FANDA_TSK_';   // 連絡済みリスト（_CONTACTED）と MEMO 単票（_MEMO）の両方
 const MAX_LEN = 4096;
 
 function corsHeaders(origin, allowed) {
