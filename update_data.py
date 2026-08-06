@@ -309,7 +309,18 @@ def read_embedded(html):
         return []
 
 
-def update_html(html, records, page_date):
+SOURCE_ID_RE = re.compile(r"const DATA_SOURCE_ID = '([^']*)'")
+
+
+def embedded_source_id(html):
+    """index.html 自身が「どの Excel を取り込んだか」を持っている。
+    状態ファイルだけを信じると、古い index.html を手で push し直した時に
+    『新版なし』のまま永久に更新されなくなるため、こちらを優先する。"""
+    m = SOURCE_ID_RE.search(html)
+    return m.group(1) if m else None
+
+
+def update_html(html, records, page_date, source_id=None):
     payload = json.dumps(records, ensure_ascii=False, separators=(",", ":"))
     html = RAW_RE.sub(lambda m: m.group(1) + payload + m.group(3), html, count=1)
 
@@ -317,6 +328,10 @@ def update_html(html, records, page_date):
     built_at = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     html = re.sub(r"(const DATA_BUILT_AT = ')[^']*(')",
                   lambda m: m.group(1) + built_at + m.group(2), html, count=1)
+    # 取り込み済みの content id を HTML 自身に持たせる（状態ファイルより優先される真実）
+    if source_id:
+        html = re.sub(r"(const DATA_SOURCE_ID = ')[^']*(')",
+                      lambda m: m.group(1) + source_id + m.group(2), html, count=1)
 
     if page_date:
         ja = "{}年{}月{}日現在".format(page_date.year, page_date.month, page_date.day)
@@ -370,12 +385,24 @@ def main():
     if args.page_date:
         info["page_date"] = datetime.date.fromisoformat(args.page_date)
 
-    same = info["content_id"] and info["content_id"] == state.get("content_id")
+    # 「取り込み済みか」は index.html 自身の DATA_SOURCE_ID で判定する。
+    # 状態ファイルだけを見ていると、古い index.html を手で push し直した時に
+    # 状態ファイルとページの中身がズレたまま永久に更新されなくなる。
+    try:
+        embedded = embedded_source_id(open(args.html, encoding="utf-8").read())
+    except OSError:
+        embedded = None
+    current = embedded if embedded is not None else state.get("content_id")
+    if embedded is not None and embedded != state.get("content_id"):
+        print("  ※ index.html の取込 id ({}) と状態ファイル ({}) が食い違っています。"
+              "index.html を優先します".format(embedded, state.get("content_id")))
+
+    same = info["content_id"] and info["content_id"] == current
     if args.check:
         if same:
             print("新版なし（前回と同じ {}）".format(info["content_id"]))
             return 0
-        print("新版あり: {}".format(info["content_id"]))
+        print("新版あり: {}（ページ内は {}）".format(info["content_id"], current))
         return 10
     if same and not args.force and not args.xlsx:
         print("新版なし。更新をスキップしました（--force で強制実行）")
@@ -429,7 +456,7 @@ def main():
     if not args.no_backup:
         shutil.copy2(args.html, args.html + ".bak")
         print("バックアップ: {}".format(args.html + ".bak"))
-    new_html = update_html(html, records, info["page_date"])
+    new_html = update_html(html, records, info["page_date"], info["content_id"])
     with open(args.html, "w", encoding="utf-8") as f:
         f.write(new_html)
     print("更新完了: {} ({:.1f} MB)".format(args.html, len(new_html.encode("utf-8")) / 1048576))
