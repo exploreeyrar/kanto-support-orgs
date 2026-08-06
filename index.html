@@ -313,7 +313,7 @@
     vertical-align: top;
   }
   tbody tr:hover { background: #f9fafb; }
-  thead th:nth-child(2), tbody td:nth-child(2) { min-width: 120px; }   /* MEMO 列 */
+  .memo-cell { min-width: 120px; }   /* MEMO 列 */
   tbody tr.contacted td {
     color: #9ca3af;
     text-decoration: line-through;
@@ -356,6 +356,39 @@
   table.hide-no   .col-no,
   table.hide-rep  .col-rep { display: none; }
 
+  table .col-action { display: none; }
+  table.show-action .col-action { display: table-cell; }
+  .action-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+  .action-check input { width: 17px; height: 17px; cursor: pointer; }
+
+  .fab-stack {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 150;
+  }
+  .fab {
+    display: none;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(0,0,0,.22);
+    white-space: nowrap;
+  }
+  .fab.show { display: inline-flex; align-items: center; gap: 6px; }
+  .fab-callback { background: #facc15; color: #3f2d00; }
+  .fab-callback:hover { background: #eab308; }
+  .fab-fav { background: #fb7185; color: #fff; }
+  .fab-fav:hover { background: #f43f5e; }
+  .fab.active { outline: 3px solid rgba(37,99,235,.35); }
+
   .id-ok {
     display: inline-block;
     margin-left: 6px;
@@ -381,9 +414,10 @@
   }
   .settings-cols { display: flex; flex-wrap: wrap; gap: 4px 18px; }
   .settings-cols .modal-check { margin-top: 4px; }
-  #tplText { width: 100%; min-height: 130px; border: 1px solid var(--border); border-radius: 8px;
+  #tplText, #cfgText { width: 100%; min-height: 130px; border: 1px solid var(--border); border-radius: 8px;
              padding: 9px 10px; font-family: inherit; font-size: 13px; line-height: 1.6; resize: vertical; }
-  #tplText:focus { outline: none; border-color: var(--accent); }
+  #tplText:focus, #cfgText:focus { outline: none; border-color: var(--accent); }
+  #cfgText { min-height: 90px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
   .tpl-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .tpl-chips button {
     border: 1px solid var(--border);
@@ -408,6 +442,7 @@
     input[type="text"], select { min-width: 0; width: 100%; font-size: 16px; }
     .pref-list { max-width: none; }
     .memo-btn { max-width: none; width: 100%; }
+    .fab { padding: 11px 15px; font-size: 12px; }
     .switch-label { white-space: normal; }
     .city-list { max-height: 150px; }
 
@@ -422,23 +457,24 @@
       padding: 4px 12px;
     }
     tbody tr:hover { background: var(--card); }
+    /* ラベルを値の上に置く。住所が複数あっても縦に積まれる */
     tbody td {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
+      display: block;
       padding: 8px 0;
       border-bottom: 1px dashed var(--border);
     }
     tbody tr td:last-child { border-bottom: none; }
     tbody td::before {
       content: attr(data-label);
-      flex: 0 0 84px;
+      display: block;
       color: var(--muted);
       font-size: 11px;
       line-height: 1.6;
+      margin-bottom: 2px;
     }
     .contact-cell { text-align: left; }
     .contact-cell input { width: 20px; height: 20px; }
+    table.show-action .col-action { display: block; }   /* カード表示でも他のセルと揃える */
     tbody td.lang { font-size: 12px; }
   }
   .city-panel { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
@@ -588,6 +624,10 @@
 </div>
 
 <div class="panel">
+  <label class="switch-label" style="margin-bottom:12px; display:inline-flex;">
+    <input type="checkbox" id="hideContactedToggle">
+    <span data-i18n="hideContactedLabel">連絡済みの機関を一覧から自動的に隠す</span>
+  </label>
   <div class="mode-bar">
     <button type="button" id="contactedOnlyBtn" aria-pressed="false" data-i18n="contactedOnlyBtn">連絡済みリストのみ表示</button>
     <button type="button" class="secondary" id="settingsBtn" data-i18n="settingsBtn">⚙️ 設定</button>
@@ -647,8 +687,9 @@
 <table>
   <thead>
     <tr>
+      <th class="col-action" data-i18n="colAction">操作</th>
       <th data-i18n="colContacted">連絡済み</th>
-      <th data-i18n="colMemo">MEMO</th>
+      <th class="memo-cell" data-i18n="colMemo">MEMO</th>
       <th data-i18n="colPhone">電話番号</th>
       <th data-i18n="colAddress">関東圏内の所在地</th>
       <th data-i18n="colName">名称</th>
@@ -663,13 +704,15 @@
 </table>
 <div class="empty" id="emptyMsg" style="display:none;" data-i18n="emptyMsg">該当するデータがありません</div>
 
-<div class="pager">
-  <button id="prevBtn" data-i18n="prevBtn">← 前へ</button>
-  <span id="pageInfo" style="font-size:13px;color:var(--muted);"></span>
-  <button id="nextBtn" data-i18n="nextBtn">次へ →</button>
-</div>
+<div id="scrollSentinel"></div>
+<div class="pager"><span id="pageInfo" style="font-size:13px;color:var(--muted);"></span></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+
+<div class="fab-stack">
+  <button type="button" class="fab fab-callback" id="fabCallback" data-i18n="fabCallback">📞 折り返し予定</button>
+  <button type="button" class="fab fab-fav" id="fabFav" data-i18n="fabFav">⭐ お気に入り</button>
+</div>
 
 <div class="modal-backdrop" id="settingsModal" role="dialog" aria-modal="true">
   <div class="modal">
@@ -713,6 +756,15 @@
       <span class="sync-result" id="tplResult"></span>
     </div>
 
+    <div class="settings-title" data-i18n="settingsShareCfg">設定の配布（他の端末・他の人へ）</div>
+    <div class="hint" data-i18n="cfgHint">「列の表示・動作・MEMO テンプレート」だけをやり取りします。連絡済み・MEMO・フィルター・折り返し・お気に入りには一切触れません。</div>
+    <textarea id="cfgText" spellcheck="false" placeholder='{"cols":…,"templates":[…]}'></textarea>
+    <div class="sync-actions">
+      <button type="button" id="cfgCopyBtn" data-i18n="cfgCopy">現在の設定をコピー</button>
+      <button type="button" class="ghost" id="cfgApplyBtn" data-i18n="cfgApply">貼り付けた設定を適用</button>
+      <span class="sync-result" id="cfgResult"></span>
+    </div>
+
     <div class="modal-actions">
       <button type="button" id="settingsCloseBtn" data-i18n="importCloseBtn">閉じる</button>
     </div>
@@ -726,6 +778,14 @@
     <div class="tpl-chips" id="tplChips"></div>
     <textarea id="memoModalText" data-i18n-placeholder="memoPlaceholder" placeholder="メモを入力"></textarea>
 
+    <label class="modal-check">
+      <input type="checkbox" id="memoCallbackToggle">
+      <span data-i18n="memoCallbackLabel">折り返し電話の予定に入れる</span>
+    </label>
+    <label class="modal-check">
+      <input type="checkbox" id="memoFavToggle">
+      <span data-i18n="memoFavLabel">お気に入りに追加</span>
+    </label>
     <label class="modal-check">
       <input type="checkbox" id="memoSendToggle" checked>
       <span data-i18n="memoSendLabel">Telegram に送信する</span>
@@ -753,8 +813,6 @@
 <script>
 const ALL_DATA = JSON.parse(document.getElementById('raw-data').textContent);
 const KANTO_PREFS = ["東京都","神奈川県","埼玉県","千葉県","茨城県","栃木県","群馬県"];
-const PAGE_SIZE = 50;
-let currentPage = 1;
 let currentLocale = 'id';
 
 // 東京都の市区町村（公式の並び：23区 → 26市 → 西多摩郡 → 島嶼部）
@@ -768,6 +826,31 @@ const TOKYO_CITIES = [
   "瑞穂町","日の出町","檜原村","奥多摩町",
   "大島町","利島村","新島村","神津島村","三宅村","御蔵島村","八丈町","青ヶ島村","小笠原村"
 ];
+// インドネシア語表示のときの地名（ローマ字）
+const PREF_ROMAJI = {
+  "東京都": "Tokyo", "神奈川県": "Kanagawa", "埼玉県": "Saitama", "千葉県": "Chiba",
+  "茨城県": "Ibaraki", "栃木県": "Tochigi", "群馬県": "Gunma"
+};
+const CITY_ROMAJI = {
+  "千代田区":"Chiyoda","中央区":"Chuo","港区":"Minato","新宿区":"Shinjuku","文京区":"Bunkyo",
+  "台東区":"Taito","墨田区":"Sumida","江東区":"Koto","品川区":"Shinagawa","目黒区":"Meguro",
+  "大田区":"Ota","世田谷区":"Setagaya","渋谷区":"Shibuya","中野区":"Nakano","杉並区":"Suginami",
+  "豊島区":"Toshima","北区":"Kita","荒川区":"Arakawa","板橋区":"Itabashi","練馬区":"Nerima",
+  "足立区":"Adachi","葛飾区":"Katsushika","江戸川区":"Edogawa",
+  "八王子市":"Hachioji","立川市":"Tachikawa","武蔵野市":"Musashino","三鷹市":"Mitaka","青梅市":"Ome",
+  "府中市":"Fuchu","昭島市":"Akishima","調布市":"Chofu","町田市":"Machida","小金井市":"Koganei",
+  "小平市":"Kodaira","日野市":"Hino","東村山市":"Higashimurayama","国分寺市":"Kokubunji",
+  "国立市":"Kunitachi","福生市":"Fussa","狛江市":"Komae","東大和市":"Higashiyamato","清瀬市":"Kiyose",
+  "東久留米市":"Higashikurume","武蔵村山市":"Musashimurayama","多摩市":"Tama","稲城市":"Inagi",
+  "羽村市":"Hamura","あきる野市":"Akiruno","西東京市":"Nishitokyo",
+  "瑞穂町":"Mizuho","日の出町":"Hinode","檜原村":"Hinohara","奥多摩町":"Okutama",
+  "大島町":"Oshima","利島村":"Toshima-mura","新島村":"Niijima","神津島村":"Kozushima",
+  "三宅村":"Miyake","御蔵島村":"Mikurajima","八丈町":"Hachijo","青ヶ島村":"Aogashima",
+  "小笠原村":"Ogasawara"
+};
+const prefLabel = p => (currentLocale === 'id' && PREF_ROMAJI[p]) ? PREF_ROMAJI[p] : p;
+const cityLabel = c => (currentLocale === 'id' && CITY_ROMAJI[c]) ? CITY_ROMAJI[c] : c;
+
 // 優先表示（リスト先頭・緑色）
 const PRIORITY_CITIES = ["渋谷区","八王子市","青梅市"];
 // 「品千代田区」のような表記ゆれにも当たるよう、長い名称から順に部分一致で判定する
@@ -818,6 +901,18 @@ function saveContacted() {
   if (!storageAvailable) return;
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(contactedSet))); } catch (e) {}
 }
+
+// 折り返し電話の予定 / お気に入り（どちらも登録番号の集合。既定値の配り直しでは消さない）
+function loadSet(key) {
+  if (!storageAvailable) return new Set();
+  try { return new Set(JSON.parse(localStorage.getItem(key) || '[]')); } catch (e) { return new Set(); }
+}
+function saveSet(key, set) {
+  if (!storageAvailable) return;
+  try { localStorage.setItem(key, JSON.stringify(Array.from(set))); } catch (e) {}
+}
+const callbackSet = loadSet('kanto_callback_v1');
+const favSet = loadSet('kanto_fav_v1');
 
 // MEMO（登録番号ごとにブラウザへ保存）
 const MEMO_KEY = 'kanto_memo_v1';
@@ -889,6 +984,12 @@ const LOCALE = {
     autoMemoLabel: '「連絡済み」にしたら MEMO を自動で開く',
     tplHint: '1 行に 1 件。MEMO 編集画面にボタンとして並びます。',
     tplReset: '初期値に戻す',
+    settingsShareCfg: '設定の配布（他の端末・他の人へ）',
+    cfgHint: '「列の表示・動作・MEMO テンプレート」だけをやり取りします。連絡済み・MEMO・フィルター・折り返し・お気に入りには一切触れません。',
+    cfgCopy: '現在の設定をコピー',
+    cfgApply: '貼り付けた設定を適用',
+    cfgApplied: '適用しました',
+    cfgInvalid: '設定として読み取れませんでした',
     tplSaved: '保存しました',
     memoSendLabel: 'Telegram に送信する',
     memoPreviewLabel: 'プレビュー — 実際に送信される内容',
@@ -915,11 +1016,19 @@ const LOCALE = {
     importDone: (added, already, miss) =>
       `${added} 件を連絡済みに追加しました（既に登録済み ${already} 件 / 一致なし ${miss} 件）`,
     emptyMsg: '該当するデータがありません',
-    prevBtn: '← 前へ',
-    nextBtn: '次へ →',
+    shownTemplate: (n, total) => `${n} / ${total} 件を表示中`,
+    colAction: '操作',
+    doneCallback: '折り返し済み',
+    removeFav: 'お気に入りから外す',
+    fabCallback: '📞 折り返し予定',
+    fabFav: '⭐ お気に入り',
+    noteCallback: '折り返し電話の予定に入れた機関だけを表示しています',
+    noteFav: 'お気に入りに入れた機関だけを表示しています',
+    hideContactedLabel: '連絡済みの機関を一覧から自動的に隠す',
+    memoCallbackLabel: '折り返し電話の予定に入れる',
+    memoFavLabel: 'お気に入りに追加',
     footer: 'データ出典：出入国在留管理庁「登録支援機関登録簿」（2026年8月3日現在） / 本ページは元データを基に自動抽出・加工したものです。最新情報は必ず出入国在留管理庁の公表資料でご確認ください。機関名・住所・代表者名は公式登録情報であるため原文（日本語）のまま表示しています。',
-    statTemplate: (n, total) => `該当件数：<b>${n}</b> 件（全 ${total} 件中）`,
-    pageInfoTemplate: (p, total) => `${p} / ${total} ページ`
+    statTemplate: (n, total) => `該当件数：<b>${n}</b> 件（全 ${total} 件中）`
   },
   id: {
     title: 'Daftar Lembaga Pendukung Terdaftar — Filter Wilayah Kanto',
@@ -976,6 +1085,12 @@ const LOCALE = {
     autoMemoLabel: 'Buka MEMO otomatis setelah ditandai sudah dihubungi',
     tplHint: 'Satu templat per baris. Akan muncul sebagai tombol di layar MEMO.',
     tplReset: 'Kembalikan ke bawaan',
+    settingsShareCfg: 'Bagikan pengaturan (ke perangkat / orang lain)',
+    cfgHint: 'Hanya kolom, perilaku, dan templat MEMO yang dipertukarkan. Data sudah dihubungi, MEMO, filter, telepon balik, dan favorit tidak tersentuh.',
+    cfgCopy: 'Salin pengaturan saat ini',
+    cfgApply: 'Terapkan pengaturan yang ditempel',
+    cfgApplied: 'Diterapkan',
+    cfgInvalid: 'Tidak bisa dibaca sebagai pengaturan',
     tplSaved: 'Tersimpan',
     memoSendLabel: 'Kirim ke Telegram',
     memoPreviewLabel: 'Pratinjau — isi yang akan dikirim',
@@ -1002,11 +1117,19 @@ const LOCALE = {
     importDone: (added, already, miss) =>
       `${added} ditambahkan ke daftar sudah dihubungi (sudah ada ${already} / tidak cocok ${miss})`,
     emptyMsg: 'Tidak ada data yang sesuai',
-    prevBtn: '← Sebelumnya',
-    nextBtn: 'Berikutnya →',
+    shownTemplate: (n, total) => `Menampilkan ${n} dari ${total}`,
+    colAction: 'Tindakan',
+    doneCallback: 'Sudah ditelepon balik',
+    removeFav: 'Hapus dari favorit',
+    fabCallback: '📞 Jadwal telepon balik',
+    fabFav: '⭐ Favorit',
+    noteCallback: 'Hanya menampilkan lembaga yang dijadwalkan untuk ditelepon balik',
+    noteFav: 'Hanya menampilkan lembaga favorit',
+    hideContactedLabel: 'Sembunyikan otomatis lembaga yang sudah dihubungi',
+    memoCallbackLabel: 'Jadwalkan telepon balik',
+    memoFavLabel: 'Tambahkan ke favorit',
     footer: 'Sumber data: Badan Imigrasi Jepang, "Daftar Lembaga Pendukung Terdaftar" (per 3 Agustus 2026) / Halaman ini dibuat secara otomatis dari data asli. Untuk informasi terbaru, selalu periksa data resmi dari Badan Imigrasi Jepang. Nama lembaga, alamat, dan nama perwakilan tetap ditampilkan dalam bahasa Jepang asli karena merupakan data registrasi resmi.',
-    statTemplate: (n, total) => `Jumlah hasil: <b>${n}</b> dari total ${total} lembaga`,
-    pageInfoTemplate: (p, total) => `Halaman ${p} dari ${total}`
+    statTemplate: (n, total) => `Jumlah hasil: <b>${n}</b> dari total ${total} lembaga`
   }
 };
 
@@ -1028,27 +1151,31 @@ function t(key) { return LOCALE[currentLocale][key]; }
 const contactedOnlyBtn = document.getElementById('contactedOnlyBtn');
 
 /* ---- 設定（列の表示・自動 MEMO・テンプレート） ---- */
+const DEFAULTS_VERSION = 2;   // ← 既定値を配り直したいときに +1 する
 const SETTINGS_KEY = 'kanto_settings_v1';
 const TPL_KEY = 'kanto_memo_templates_v1';
-const COLS = ['lang', 'date', 'no', 'rep'];          // 既定はすべて非表示
-const DEFAULT_SETTINGS = { cols: { lang: false, date: false, no: false, rep: false }, autoMemo: true };
+const CALLBACK_KEY = 'kanto_callback_v1';   // 折り返し電話の予定
+const FAV_KEY = 'kanto_fav_v1';             // お気に入り
+const COLS = ['lang', 'date', 'no', 'rep'];          // 登録年月日のみ既定で表示
+const DEFAULT_SETTINGS = { cols: { lang: false, date: true, no: false, rep: false }, autoMemo: true };
 
-// 電話での聞き取り結果としてよくある返答のひな形（設定画面で自由に編集できる）
+// 実際に使われている MEMO の文言をそのままひな形にしている（設定画面で編集・保存できる）
 const DEFAULT_TEMPLATES = [
-  'Tidak diangkat（不在）',
-  'Nomor tidak aktif / salah sambung（番号なし・誤番）',
-  'Diminta kirim email dulu → ',
-  'Diminta kirim CV / rirekisho',
-  'Sedang tidak menerima pendaftaran baru（新規受付停止中）',
-  'Kuota sudah penuh（定員いっぱい）',
-  'Tidak melayani Bahasa Indonesia（インドネシア語対応なし）',
-  'Hanya menangani bidang → ',
-  'Diminta telepon ulang → ',
-  'Menunggu kabar dari mereka（先方連絡待ち）',
-  'PIC / 担当者 → ',
-  'Wawancara dijadwalkan → ',
-  'Ditolak（お断り）',
-  'Tertarik, lanjut proses（前向き・継続）'
+  'Diminta telepon ulang →',
+  'Nomor tidak aktif / salah sambung ga bisa di hubungi',
+  'Nomer perusahaan belum ada loker',
+  'Belum ada',
+  'Bukan perusahaan kaigo',
+  'Konsultan masalah visa bukan agen pencari kerja',
+  'Perusahaan pendukung, job luar tokyo',
+  'Kaigo dikit dan daerah Tokyo ga ada, media ada loker',
+  'Butuhnya otomotif',
+  'Perusahaan jual alat berat',
+  'Job restoran',
+  'Restoran',
+  'Harus lulusan kuliah',
+  'Visaku ga bisa',
+  'Ini tsk ku'
 ];
 
 function loadJson(key, fallback) {
@@ -1063,9 +1190,22 @@ function saveJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
 }
 
-let settings = Object.assign({}, DEFAULT_SETTINGS, loadJson(SETTINGS_KEY, {}));
+/* 保存された「設定」「テンプレート」は、この版番号と一致するときだけ採用する。
+   index.html を配布し直すときに DEFAULTS_VERSION を上げれば、各自がカスタムしていても
+   全員が新しい既定値に揃う。※「連絡済み」「MEMO」「フィルター」「折り返し」「お気に入り」
+   の各データは別キーで、この仕組みでは絶対に触らない。 */
+function loadVersioned(key, fallback) {
+  const box = loadJson(key, null);
+  if (!box || typeof box !== 'object' || box.v !== DEFAULTS_VERSION) return fallback;
+  return box.data === undefined ? fallback : box.data;
+}
+function saveVersioned(key, data) {
+  saveJson(key, { v: DEFAULTS_VERSION, data: data });
+}
+
+let settings = Object.assign({}, DEFAULT_SETTINGS, loadVersioned(SETTINGS_KEY, {}));
 settings.cols = Object.assign({}, DEFAULT_SETTINGS.cols, settings.cols || {});
-let templates = loadJson(TPL_KEY, null) || DEFAULT_TEMPLATES.slice();
+let templates = loadVersioned(TPL_KEY, null) || DEFAULT_TEMPLATES.slice();
 
 function applyColumnVisibility() {
   const table = document.querySelector('table');
@@ -1120,7 +1260,8 @@ function loadLastRun() {
 const prefListEl = document.getElementById('prefList');
 KANTO_PREFS.forEach(p => {
   const label = document.createElement('label');
-  label.innerHTML = `<input type="checkbox" value="${p}" checked> ${p}`;
+  label.innerHTML = `<input type="checkbox" value="${p}" checked> <span class="pref-name" data-pref="${p}">${p}</span>`;
+  label.title = p;
   prefListEl.appendChild(label);
 });
 
@@ -1142,9 +1283,16 @@ const orderedCities = PRIORITY_CITIES.filter(c => cityCount[c])
 orderedCities.forEach(c => {
   const label = document.createElement('label');
   if (PRIORITY_CITIES.includes(c)) label.className = 'prio';
-  label.innerHTML = `<input type="checkbox" value="${c}"> ${c}<span class="cnt">(${cityCount[c]})</span>`;
+  label.innerHTML = `<input type="checkbox" value="${c}"> <span class="city-name" data-city="${c}">${c}</span><span class="cnt">(${cityCount[c]})</span>`;
+  label.title = c;
   cityListEl.appendChild(label);
 });
+
+// 言語切替のたびに都道府県・市区町村の表示名を差し替える
+function updatePlaceLabels() {
+  prefListEl.querySelectorAll('.pref-name').forEach(el => { el.textContent = prefLabel(el.dataset.pref); });
+  cityListEl.querySelectorAll('.city-name').forEach(el => { el.textContent = cityLabel(el.dataset.city); });
+}
 
 function getCheckedCities() {
   return Array.from(cityListEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
@@ -1217,6 +1365,59 @@ function compareByDate(a, b, dir) {
   return dir === 'asc' ? noCmp : -noCmp;
 }
 
+const BATCH = 100;              // 下までスクロールするたびに追加で描画する件数
+let renderLimit = BATCH;
+let currentList = [];
+let viewMode = 'normal';       // normal | contacted | callback | fav
+
+function resetScroll() { renderLimit = BATCH; }
+
+function makeRow(item) {
+  const tr = document.createElement('tr');
+  if (contactedSet.has(item.no)) tr.classList.add('contacted');
+  const prefTags = item.prefs.map(p => `<span class="tag" title="${p}">${prefLabel(p)}</span>`).join('');
+  const officesHtml = item.offices.map(o => {
+    const nameShown = (o.name && o.name !== item.name) ? `<div class="office-name">${o.name}</div>` : '';
+    return `<div class="office">${nameShown}${o.address}</div>`;
+  }).join('');
+  const actionLabel = viewMode === 'callback' ? t('doneCallback') : t('removeFav');
+  tr.innerHTML = `
+    <td class="col-action" data-label="${t('colAction')}"><label class="action-check"><input type="checkbox" class="action-checkbox" data-no="${item.no}"> ${actionLabel}</label></td>
+    <td class="contact-cell" data-label="${t('colContacted')}"><input type="checkbox" class="contact-checkbox" data-no="${item.no}" ${contactedSet.has(item.no) ? 'checked' : ''}></td>
+    <td class="memo-cell" data-label="${t('colMemo')}">${memoCellHtml(item)}</td>
+    <td data-label="${t('colPhone')}">${item.phone ? `<button type="button" class="phone-copy" data-phone="${item.phone}" title="${t('copyHint')}">${item.phone}</button>` : ''}${idOkBadge(item)}</td>
+    <td data-label="${t('colAddress')}">${officesHtml}</td>
+    <td data-label="${t('colName')}">${item.name}</td>
+    <td data-label="${t('colPref')}">${prefTags}</td>
+    <td class="lang col-lang" data-label="${t('colLang')}">${item.lang || ''}</td>
+    <td class="col-date" data-label="${t('colDate')}">${item.date || ''}</td>
+    <td class="no col-no" data-label="${t('colNo')}">${item.no}</td>
+    <td class="col-rep" data-label="${t('colRep')}">${item.rep || ''}</td>
+  `;
+  return tr;
+}
+
+function appendRows(from, to) {
+  const tbody = document.getElementById('tbody');
+  const frag = document.createDocumentFragment();
+  currentList.slice(from, to).forEach(item => frag.appendChild(makeRow(item)));
+  tbody.appendChild(frag);
+  updateListFooter();
+}
+
+function updateListFooter() {
+  const shown = Math.min(renderLimit, currentList.length);
+  document.getElementById('pageInfo').textContent =
+    currentList.length ? t('shownTemplate')(shown, currentList.length) : '';
+}
+
+function loadMore() {
+  if (renderLimit >= currentList.length) return;
+  const from = renderLimit;
+  renderLimit += BATCH;
+  appendRows(from, renderLimit);
+}
+
 function render() {
   const keyword = document.getElementById('search').value.trim();
   const prefs = getCheckedPrefs();
@@ -1224,64 +1425,42 @@ function render() {
   const idOnly = document.getElementById('idOnlyToggle').checked;
   const cities = getCheckedCities();
   const sortDir = document.getElementById('sortFilter').value === 'date_asc' ? 'asc' : 'desc';
-  const contactedOnly = contactedOnlyBtn.getAttribute('aria-pressed') === 'true';
+  const hideContacted = document.getElementById('hideContactedToggle').checked;
+  const special = viewMode !== 'normal';
 
   cityPanelEl.style.display = prefs.includes('東京都') ? '' : 'none';
   applyColumnVisibility();
-  document.getElementById('controlsRow').classList.toggle('muted', contactedOnly);
-  contactedOnlyBtn.closest('.mode-bar').classList.toggle('active', contactedOnly);
+  document.querySelector('table').classList.toggle('show-action', viewMode === 'callback' || viewMode === 'fav');
+  document.getElementById('controlsRow').classList.toggle('muted', special);
+  contactedOnlyBtn.closest('.mode-bar').classList.toggle('active', special);
+  contactedOnlyBtn.setAttribute('aria-pressed', viewMode === 'contacted' ? 'true' : 'false');
+  const note = document.getElementById('contactedOnlyNote');
+  note.textContent = viewMode === 'callback' ? t('noteCallback')
+    : viewMode === 'fav' ? t('noteFav')
+    : t('contactedOnlyNote');
 
-  // 連絡済みモードでは他のフィルターを一切かけず、チェック済みの機関をすべて表示する
-  const filtered = contactedOnly
-    ? ALL_DATA.filter(item => contactedSet.has(item.no))
-    : ALL_DATA.filter(item => matchesFilters(item, keyword, prefs, lang, idOnly, cities));
-  filtered.sort((a, b) => compareByDate(a, b, sortDir));
+  // 特別モードでは他のフィルターを一切かけず、その集合をすべて表示する
+  if (viewMode === 'contacted')      currentList = ALL_DATA.filter(i => contactedSet.has(i.no));
+  else if (viewMode === 'callback')  currentList = ALL_DATA.filter(i => callbackSet.has(i.no));
+  else if (viewMode === 'fav')       currentList = ALL_DATA.filter(i => favSet.has(i.no));
+  else {
+    currentList = ALL_DATA.filter(item => matchesFilters(item, keyword, prefs, lang, idOnly, cities));
+    if (hideContacted) currentList = currentList.filter(i => !contactedSet.has(i.no));
+  }
+  currentList.sort((a, b) => compareByDate(a, b, sortDir));
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  if (currentPage > totalPages) currentPage = totalPages;
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = filtered.slice(start, start + PAGE_SIZE);
-
-  document.getElementById('stat').innerHTML = t('statTemplate')(filtered.length, ALL_DATA.length);
-
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = '';
-  document.getElementById('emptyMsg').style.display = filtered.length === 0 ? 'block' : 'none';
-
-  pageItems.forEach(item => {
-    const tr = document.createElement('tr');
-    const isContacted = contactedSet.has(item.no);
-    if (isContacted) tr.classList.add('contacted');
-    const prefTags = item.prefs.map(p => `<span class="tag">${p}</span>`).join('');
-    const officesHtml = item.offices.map(o => {
-      const nameShown = (o.name && o.name !== item.name) ? `<div class="office-name">${o.name}</div>` : '';
-      return `<div class="office">${nameShown}${o.address}</div>`;
-    }).join('');
-    tr.innerHTML = `
-      <td class="contact-cell" data-label="${t('colContacted')}"><input type="checkbox" class="contact-checkbox" data-no="${item.no}" ${isContacted ? 'checked' : ''}></td>
-      <td data-label="${t('colMemo')}">${memoCellHtml(item)}</td>
-      <td data-label="${t('colPhone')}">${item.phone ? `<button type="button" class="phone-copy" data-phone="${item.phone}" title="${t('copyHint')}">${item.phone}</button>` : ''}${idOkBadge(item)}</td>
-      <td data-label="${t('colAddress')}">${officesHtml}</td>
-      <td data-label="${t('colName')}">${item.name}</td>
-      <td data-label="${t('colPref')}">${prefTags}</td>
-      <td class="lang col-lang" data-label="${t('colLang')}">${item.lang || ''}</td>
-      <td class="col-date" data-label="${t('colDate')}">${item.date || ''}</td>
-      <td class="no col-no" data-label="${t('colNo')}">${item.no}</td>
-      <td class="col-rep" data-label="${t('colRep')}">${item.rep || ''}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('pageInfo').textContent = t('pageInfoTemplate')(currentPage, totalPages);
-  document.getElementById('prevBtn').disabled = currentPage <= 1;
-  document.getElementById('nextBtn').disabled = currentPage >= totalPages;
-
+  document.getElementById('stat').innerHTML = t('statTemplate')(currentList.length, ALL_DATA.length);
+  document.getElementById('tbody').innerHTML = '';
+  document.getElementById('emptyMsg').style.display = currentList.length === 0 ? 'block' : 'none';
+  if (renderLimit < BATCH) renderLimit = BATCH;
+  appendRows(0, renderLimit);
+  updateFloatingButtons();
   saveFilters();
 }
 
 // インドネシア語対応なら電話番号の後ろにバッジを出す（Telegram 送信内容には含めない）
 function idOkBadge(item) {
-  return (item.lang || '').includes('インドネシア語') ? '<span class="id-ok">🇮🇩 🗣️ OK</span>' : '';
+  return (item.lang || '').includes('インドネシア語') ? '<span class="id-ok">🇮🇩 OK</span>' : '';
 }
 
 /* ---- MEMO：未記入なら鉛筆ボタン、記入済みなら本文。どちらもタップでモーダルを開く ---- */
@@ -1359,6 +1538,8 @@ function openMemoModal(no) {
     `${item.name}${item.phone ? '（' + String(item.phone).split(/[\n,、]/)[0] + '）' : ''}`;
   memoModalText.value = memoMap[no] || '';
   memoSendToggle.checked = true;          // 既定でオン
+  document.getElementById('memoCallbackToggle').checked = callbackSet.has(no);
+  document.getElementById('memoFavToggle').checked = favSet.has(no);
   document.getElementById('memoSaveBtn').textContent = t('memoSaveSend');
   updateMemoPreview();
   memoModal.classList.add('open');
@@ -1379,6 +1560,15 @@ function commitMemo(value, send) {
   if (value.trim()) memoMap[no] = value;
   else delete memoMap[no];
   saveMemos();
+
+  const wantCallback = document.getElementById('memoCallbackToggle').checked;
+  const wantFav = document.getElementById('memoFavToggle').checked;
+  if (wantCallback) callbackSet.add(no); else callbackSet.delete(no);
+  if (wantFav) favSet.add(no); else favSet.delete(no);
+  saveSet(CALLBACK_KEY, callbackSet);
+  saveSet(FAV_KEY, favSet);
+  updateFloatingButtons();
+
   closeMemoModal();
 
   // 保存は必ず先に済ませ、送信は後から（失敗しても入力内容は失われない）
@@ -1641,6 +1831,7 @@ function applyLocale(loc) {
   });
   document.getElementById('pageTitle').textContent = LOCALE[loc].title;
   document.getElementById('cdClose').title = LOCALE[loc].cdClose;
+  updatePlaceLabels();
   renderAutoUpdate();
   updateLangOptionLabels();
   render();
@@ -1650,9 +1841,53 @@ document.getElementById('localeToggle').addEventListener('click', () => {
   applyLocale(currentLocale === 'ja' ? 'id' : 'ja');
 });
 
-document.getElementById('search').addEventListener('input', () => { currentPage = 1; render(); });
-langSelect.addEventListener('change', () => { currentPage = 1; render(); });
-document.getElementById('idOnlyToggle').addEventListener('change', () => { currentPage = 1; render(); });
+document.getElementById('search').addEventListener('input', () => { resetScroll(); render(); });
+langSelect.addEventListener('change', () => { resetScroll(); render(); });
+document.getElementById('idOnlyToggle').addEventListener('change', () => { resetScroll(); render(); });
+
+/* ---- 折り返し予定 / お気に入りの浮動ボタン ---- */
+function updateFloatingButtons() {
+  const cb = document.getElementById('fabCallback');
+  const fv = document.getElementById('fabFav');
+  cb.classList.toggle('show', callbackSet.size > 0);
+  fv.classList.toggle('show', favSet.size > 0);
+  cb.classList.toggle('active', viewMode === 'callback');
+  fv.classList.toggle('active', viewMode === 'fav');
+  cb.textContent = `${t('fabCallback')} (${callbackSet.size})`;
+  fv.textContent = `${t('fabFav')} (${favSet.size})`;
+}
+
+function setViewMode(mode) {
+  viewMode = (viewMode === mode) ? 'normal' : mode;   // 同じボタンでトグル
+  resetScroll();
+  render();
+  document.getElementById('stat').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+document.getElementById('fabCallback').addEventListener('click', () => setViewMode('callback'));
+document.getElementById('fabFav').addEventListener('click', () => setViewMode('fav'));
+
+// 一覧内の「対応済み」チェック：折り返し予定／お気に入りから外す（＝一覧から消える）
+document.getElementById('tbody').addEventListener('change', (e) => {
+  const cb = e.target.closest('.action-checkbox');
+  if (!cb) return;
+  const no = cb.dataset.no;
+  if (viewMode === 'callback') { callbackSet.delete(no); saveSet(CALLBACK_KEY, callbackSet); }
+  else if (viewMode === 'fav') { favSet.delete(no); saveSet(FAV_KEY, favSet); }
+  const tr = cb.closest('tr');
+  currentList = currentList.filter(i => i.no !== no);
+  tr.remove();
+  updateListFooter();
+  updateFloatingButtons();
+  document.getElementById('stat').innerHTML = t('statTemplate')(currentList.length, ALL_DATA.length);
+  if (!currentList.length) render();
+});
+
+/* ---- 下までスクロールしたら続きを描画する ---- */
+const scrollObserver = new IntersectionObserver((entries) => {
+  if (entries.some(en => en.isIntersecting)) loadMore();
+}, { rootMargin: '400px' });
+scrollObserver.observe(document.getElementById('scrollSentinel'));
 
 /* ---- 設定モーダル ---- */
 const settingsModal = document.getElementById('settingsModal');
@@ -1674,52 +1909,70 @@ settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal)
 settingsModal.querySelectorAll('.col-toggle').forEach(cb => {
   cb.addEventListener('change', () => {
     settings.cols[cb.dataset.col] = cb.checked;
-    saveJson(SETTINGS_KEY, settings);
+    saveVersioned(SETTINGS_KEY, settings);
     applyColumnVisibility();
   });
 });
 document.getElementById('autoMemoToggle').addEventListener('change', (e) => {
   settings.autoMemo = e.target.checked;
-  saveJson(SETTINGS_KEY, settings);
+  saveVersioned(SETTINGS_KEY, settings);
 });
 document.getElementById('tplSaveBtn').addEventListener('click', () => {
   templates = document.getElementById('tplText').value.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-  saveJson(TPL_KEY, templates);
+  saveVersioned(TPL_KEY, templates);
   document.getElementById('tplResult').textContent = t('tplSaved');
 });
+document.getElementById('cfgCopyBtn').addEventListener('click', () => {
+  const json = JSON.stringify({ cols: settings.cols, autoMemo: settings.autoMemo, templates: templates });
+  document.getElementById('cfgText').value = json;
+  copyText(json).then(ok => {
+    document.getElementById('cfgResult').textContent = ok ? t('copied').replace(/[:：]\s*$/, '') : t('copyFailed');
+  });
+});
+document.getElementById('cfgApplyBtn').addEventListener('click', () => {
+  const res = document.getElementById('cfgResult');
+  let cfg = null;
+  try { cfg = JSON.parse(document.getElementById('cfgText').value); } catch (e) { cfg = null; }
+  if (!cfg || typeof cfg !== 'object') { res.textContent = t('cfgInvalid'); return; }
+  if (cfg.cols && typeof cfg.cols === 'object') settings.cols = Object.assign({}, DEFAULT_SETTINGS.cols, cfg.cols);
+  if (typeof cfg.autoMemo === 'boolean') settings.autoMemo = cfg.autoMemo;
+  if (Array.isArray(cfg.templates) && cfg.templates.length) {
+    templates = cfg.templates.map(String);
+    saveVersioned(TPL_KEY, templates);
+  }
+  saveVersioned(SETTINGS_KEY, settings);
+  openSettings();                 // 画面のチェック状態を作り直す
+  applyColumnVisibility();
+  res.textContent = t('cfgApplied');
+});
+
 document.getElementById('tplResetBtn').addEventListener('click', () => {
   templates = DEFAULT_TEMPLATES.slice();
-  saveJson(TPL_KEY, templates);
+  if (storageAvailable) { try { localStorage.removeItem(TPL_KEY); } catch (e) {} }
   document.getElementById('tplText').value = templates.join('\n');
   document.getElementById('tplResult').textContent = t('tplSaved');
 });
-prefListEl.addEventListener('change', () => { currentPage = 1; render(); });
+prefListEl.addEventListener('change', () => { resetScroll(); render(); });
 document.getElementById('prefAll').addEventListener('click', () => {
   prefListEl.querySelectorAll('input').forEach(cb => cb.checked = true);
-  currentPage = 1; render();
+  resetScroll(); render();
 });
 document.getElementById('prefNone').addEventListener('click', () => {
   prefListEl.querySelectorAll('input').forEach(cb => cb.checked = false);
-  currentPage = 1; render();
+  resetScroll(); render();
 });
-document.getElementById('sortFilter').addEventListener('change', () => { currentPage = 1; render(); });
-cityListEl.addEventListener('change', () => { currentPage = 1; render(); });
+document.getElementById('sortFilter').addEventListener('change', () => { resetScroll(); render(); });
+cityListEl.addEventListener('change', () => { resetScroll(); render(); });
 document.getElementById('cityAll').addEventListener('click', () => {
   cityListEl.querySelectorAll('input').forEach(cb => cb.checked = true);
-  currentPage = 1; render();
+  resetScroll(); render();
 });
 document.getElementById('cityNone').addEventListener('click', () => {
   cityListEl.querySelectorAll('input').forEach(cb => cb.checked = false);
-  currentPage = 1; render();
+  resetScroll(); render();
 });
-document.getElementById('prevBtn').addEventListener('click', () => { currentPage--; render(); });
-document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; render(); });
-contactedOnlyBtn.addEventListener('click', () => {
-  const on = contactedOnlyBtn.getAttribute('aria-pressed') === 'true';
-  contactedOnlyBtn.setAttribute('aria-pressed', on ? 'false' : 'true');
-  currentPage = 1;
-  render();
-});
+contactedOnlyBtn.addEventListener('click', () => setViewMode('contacted'));
+document.getElementById('hideContactedToggle').addEventListener('change', () => { resetScroll(); render(); });
 
 /* ---- 画面の状態（検索語・各フィルター・ボタン・言語・ページ）を保存して復元する
        初期値は東京都「渋谷区」のみチェック ---- */
@@ -1741,7 +1994,7 @@ function saveFilters() {
       sort: sortEl.value,
       contactedOnly: contactedOnlyBtn.getAttribute('aria-pressed') === 'true',
       locale: currentLocale,
-      page: currentPage
+      hideContacted: document.getElementById('hideContactedToggle').checked
     }));
   } catch (e) {}
 }
@@ -1765,7 +2018,7 @@ function restoreFilters() {
   if (saved.sort === 'date_asc' || saved.sort === 'date_desc') sortEl.value = saved.sort;
   if (saved.contactedOnly === true) contactedOnlyBtn.setAttribute('aria-pressed', 'true');
   if (saved.locale === 'ja' || saved.locale === 'id') currentLocale = saved.locale;
-  if (Number.isInteger(saved.page) && saved.page > 0) currentPage = saved.page;
+  if (typeof saved.hideContacted === 'boolean') document.getElementById('hideContactedToggle').checked = saved.hideContacted;
 }
 
 restoreFilters();
