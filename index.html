@@ -474,6 +474,9 @@
     }
     .contact-cell { text-align: left; }
     .contact-cell input { width: 20px; height: 20px; }
+    /* 発信リンクは指で押しやすい高さにし、複数番号は縦に積む */
+    .phone-list { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+    .phone-dial { min-height: 34px; font-size: 16px; }
     table.show-action .col-action { display: block; }   /* カード表示でも他のセルと揃える */
     tbody td.lang { font-size: 12px; }
   }
@@ -515,6 +518,20 @@
   .phone-copy:hover { text-decoration: underline; }
   .phone-copy.copied { color: #16a34a; }
   tr.contacted .phone-copy { color: #9ca3af; }
+  /* 複数番号を持つ機関があるので 1 件ずつ並べる */
+  .phone-list { display: inline-flex; flex-wrap: wrap; gap: 2px 12px; }
+  /* タッチ端末ではタップで発信するリンクにする */
+  .phone-dial {
+    font: inherit;
+    color: var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .phone-dial::before { content: '📞'; font-size: 13px; }
+  tr.contacted .phone-dial { color: #9ca3af; }
   #toast {
     position: fixed;
     left: 50%;
@@ -958,6 +975,7 @@ const LOCALE = {
     cdRestoreAfter: '⏱ FDA失業からの経過時間',
     cdClose: '非表示にする',
     copyHint: 'クリックで電話番号をコピー',
+    dialHint: 'タップで発信',
     copied: '電話番号をコピーしました：',
     copyFailed: 'コピーできませんでした',
     prefLabel: '都道府県',
@@ -1059,6 +1077,7 @@ const LOCALE = {
     cdRestoreAfter: '⏱ Waktu sejak FDA di-PHK',
     cdClose: 'Sembunyikan',
     copyHint: 'Klik untuk menyalin nomor telepon',
+    dialHint: 'Ketuk untuk menelepon',
     copied: 'Nomor telepon disalin: ',
     copyFailed: 'Gagal menyalin nomor telepon',
     prefLabel: 'Prefektur',
@@ -1372,6 +1391,22 @@ let viewMode = 'normal';       // normal | contacted | callback | fav
 
 function resetScroll() { renderLimit = BATCH; }
 
+/* スマホなど発信できる端末では、番号タップでそのまま電話をかける。
+   マウス操作の PC はこれまで通りクリックでコピー。 */
+const CAN_DIAL = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  || /Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+
+// 電話番号セル。複数番号を持つ機関があるので改行・読点で分けて 1 件ずつ出す
+function phoneCellHtml(item) {
+  const parts = String(item.phone || '').split(/[\n,、]/).map(s => s.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  const html = parts.map(p => CAN_DIAL
+    ? `<a class="phone-dial" href="tel:${p.replace(/[^\d+]/g, '')}" title="${t('dialHint')}">${p}</a>`
+    : `<button type="button" class="phone-copy" data-phone="${p}" title="${t('copyHint')}">${p}</button>`
+  ).join('');
+  return `<span class="phone-list">${html}</span>`;
+}
+
 function makeRow(item) {
   const tr = document.createElement('tr');
   if (contactedSet.has(item.no)) tr.classList.add('contacted');
@@ -1385,7 +1420,7 @@ function makeRow(item) {
     <td class="col-action" data-label="${t('colAction')}"><label class="action-check"><input type="checkbox" class="action-checkbox" data-no="${item.no}"> ${actionLabel}</label></td>
     <td class="contact-cell" data-label="${t('colContacted')}"><input type="checkbox" class="contact-checkbox" data-no="${item.no}" ${contactedSet.has(item.no) ? 'checked' : ''}></td>
     <td class="memo-cell" data-label="${t('colMemo')}">${memoCellHtml(item)}</td>
-    <td data-label="${t('colPhone')}">${item.phone ? `<button type="button" class="phone-copy" data-phone="${item.phone}" title="${t('copyHint')}">${item.phone}</button>` : ''}${idOkBadge(item)}</td>
+    <td data-label="${t('colPhone')}">${phoneCellHtml(item)}${idOkBadge(item)}</td>
     <td data-label="${t('colAddress')}">${officesHtml}</td>
     <td data-label="${t('colName')}">${item.name}</td>
     <td data-label="${t('colPref')}">${prefTags}</td>
